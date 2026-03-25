@@ -38,7 +38,7 @@ function Register() {
             <label className="form-label">Full Name</label>
             <input
               type="text"
-              placeholder="John Doe"
+              placeholder="xyz abcccc"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="form-input"

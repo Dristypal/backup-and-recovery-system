@@ -24,7 +24,7 @@ function Sidebar() {
       <div className="sidebar-header">
         <div className="logo">
           <span className="logo-icon">☁️</span>
-          <span className="logo-text">Student Portal</span>
+          <span className="logo-text">CLOUDORIA</span>
         </div>
       </div>
 
