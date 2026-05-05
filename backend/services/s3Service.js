@@ -9,6 +9,23 @@ const AppError = require('../utils/AppError');
 
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
 const region = process.env.AWS_REGION;
+const s3OperationTimeoutMs = Number(process.env.S3_OPERATION_TIMEOUT_MS || 5000);
+
+const withTimeout = async (operation, timeoutMs = s3OperationTimeoutMs) => {
+  let timeoutId;
+
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`S3 operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 const buildFileUrl = (key, versionId) => {
   const baseUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${encodeURIComponent(key)}`;
@@ -31,7 +48,7 @@ const uploadBuffer = async ({ key, body, contentType, metadata = {} }) => {
     Metadata: metadata
   });
 
-  const response = await s3Client.send(command);
+  const response = await withTimeout(s3Client.send(command));
 
   return {
     key,
@@ -49,7 +66,7 @@ const getObjectStream = async ({ key, versionId = null }) => {
       VersionId: versionId || undefined
     });
 
-    return await s3Client.send(command);
+    return await withTimeout(s3Client.send(command));
   } catch (error) {
     throw new AppError('Unable to fetch the requested object from S3', 404, error.message);
   }
@@ -71,20 +88,20 @@ const getObjectBuffer = async ({ key, versionId = null }) => {
 };
 
 const ensureBucketVersioningEnabled = async () => {
-  const statusResponse = await s3Client.send(new GetBucketVersioningCommand({
+  const statusResponse = await withTimeout(s3Client.send(new GetBucketVersioningCommand({
     Bucket: bucketName
-  }));
+  })));
 
   if (statusResponse.Status === 'Enabled') {
     return { enabled: true, changed: false };
   }
 
-  await s3Client.send(new PutBucketVersioningCommand({
+  await withTimeout(s3Client.send(new PutBucketVersioningCommand({
     Bucket: bucketName,
     VersioningConfiguration: {
       Status: 'Enabled'
     }
-  }));
+  })));
 
   return { enabled: true, changed: true };
 };

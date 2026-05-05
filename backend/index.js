@@ -35,15 +35,18 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
-  try {
-    const versioningStatus = await ensureBucketVersioningEnabled();
-    console.log(`S3 bucket versioning enabled${versioningStatus.changed ? ' (updated during startup)' : ''}.`);
-  } catch (error) {
-    console.error(`S3 versioning check failed: ${error.message}`);
-  }
+  setImmediate(() => {
+    ensureBucketVersioningEnabled()
+      .then((versioningStatus) => {
+        console.log(`S3 bucket versioning enabled${versioningStatus.changed ? ' (updated during startup)' : ''}.`);
+      })
+      .catch((error) => {
+        console.error(`S3 versioning check failed: ${error.message}`);
+      });
+  });
 
   startBackupCron();
 });

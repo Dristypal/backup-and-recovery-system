@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-backup-app
+  namespace: cloud-backup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-backup-app
+  template:
+    metadata:
+      labels:
+        app: cloud-backup-app
+    spec:
+      serviceAccountName: cloud-backup-app
+      containers:
+        - name: app
+          image: 001961766026.dkr.ecr.ap-south-1.amazonaws.com/cloud-backup-recovery:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5001
+          env:
+            - name: PORT
+              value: "5001"
+            - name: NODE_ENV
+              value: production
+            - name: MONGODB_URI
+              value: mongodb://mongo:27017/dashboard
+            - name: AWS_REGION
+              value: ap-south-1
+            - name: AWS_S3_BUCKET_NAME
+              value: cloudbackuprecovery-simple-001961766026-20260505
+            - name: S3_OPERATION_TIMEOUT_MS
+              value: "5000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-backup-secrets
+                  key: JWT_SECRET
+            - name: ADMIN_REGISTRATION_CODE
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-backup-secrets
+                  key: ADMIN_REGISTRATION_CODE
+            - name: BACKUP_CRON_SCHEDULE
+              value: 0 1 * * *
+            - name: BACKUP_CRON_TIMEZONE
+              value: UTC
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 5001
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-backup-app
+  namespace: cloud-backup
+spec:
+  type: LoadBalancer
+  selector:
+    app: cloud-backup-app
+  ports:
+    - port: 80
+      targetPort: 5001

@@ -1,0 +1,12 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 001961766026.dkr.ecr.ap-south-1.amazonaws.com
+  build:
+    commands:
+      - docker build --build-arg VITE_API_URL=/api -t 001961766026.dkr.ecr.ap-south-1.amazonaws.com/cloud-backup-recovery:latest .
+  post_build:
+    commands:
+      - docker push 001961766026.dkr.ecr.ap-south-1.amazonaws.com/cloud-backup-recovery:latest

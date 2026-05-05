@@ -1,0 +1,9 @@
+.git
+backend/.env
+backend/node_modules
+backend/runtime-backend.err
+frontend/.env
+frontend/node_modules
+frontend/dist
+**/.DS_Store
+**/*.log
