@@ -1,79 +1,86 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/useAuth';
 import './Auth.css';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setErrorMessage('');
+
     try {
       setLoading(true);
       await login(email, password);
       navigate('/dashboard');
     } catch (error) {
-      alert(error.response?.data?.message || 'Login failed');
+      setErrorMessage(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
+    <div className="auth-shell">
+      <div className="auth-panel brand">
+        <p className="auth-kicker">Cloud Backup Platform</p>
+        <h1>Recover your data without panic.</h1>
+        <p>
+          Secure files in S3, trigger database snapshots, and restore versions from one dashboard.
+        </p>
+        <ul className="feature-list">
+          <li>Version-aware file recovery</li>
+          <li>Daily database backups</li>
+          <li>MongoDB metadata and audit logs</li>
+        </ul>
+      </div>
+
+      <div className="auth-panel form">
         <div className="auth-header">
-          <div className="auth-logo">☁️</div>
-          <h1 className="auth-title">Cloudoria</h1>
-          <p className="auth-subtitle">Sign in to your account</p>
+          <div className="auth-logo">CB</div>
+          <h2>Sign In</h2>
+          <p>Access your recovery console</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label className="form-label">Email</label>
+          <label className="form-label">
+            Email
             <input
               type="email"
-              placeholder="student@university.edu"
+              placeholder="eshika@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               className="form-input"
               required
             />
-          </div>
+          </label>
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
+          <label className="form-label">
+            Password
             <input
               type="password"
               placeholder="Enter your password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               className="form-input"
               required
             />
-          </div>
+          </label>
 
-          <button 
-            type="submit" 
-            className="auth-btn"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Signing in...
-              </>
-            ) : (
-              'Sign In'
-            )}
+          {errorMessage && <div className="form-alert">{errorMessage}</div>}
+
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? 'Signing in...' : 'Login'}
           </button>
 
           <p className="auth-footer">
-            Don't have an account? <Link to="/register">Register here</Link>
+            New here? <Link to="/register">Create an account</Link>
           </p>
         </form>
       </div>

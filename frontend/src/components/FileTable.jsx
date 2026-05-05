@@ -1,79 +1,87 @@
 import { useState } from 'react';
 import './FileTable.css';
 
-function FileTable({ files, onDownload, onDelete, onRestore }) {
+function FileTable({ files, onDelete, onDownload, onRestore }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'uploadedAt', direction: 'desc' });
 
-  // Filter files based on search
   const filteredFiles = files.filter((file) =>
     file.originalName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Sort files
-  const sortedFiles = [...filteredFiles].sort((a, b) => {
+  const sortedFiles = [...filteredFiles].sort((firstFile, secondFile) => {
+    const directionMultiplier = sortConfig.direction === 'asc' ? 1 : -1;
+
     if (sortConfig.key === 'uploadedAt') {
-      return sortConfig.direction === 'asc'
-        ? new Date(a.uploadedAt) - new Date(b.uploadedAt)
-        : new Date(b.uploadedAt) - new Date(a.uploadedAt);
+      return (new Date(firstFile.uploadedAt) - new Date(secondFile.uploadedAt)) * directionMultiplier;
     }
+
     if (sortConfig.key === 'fileSize') {
-      return sortConfig.direction === 'asc'
-        ? a.fileSize - b.fileSize
-        : b.fileSize - a.fileSize;
+      return (firstFile.fileSize - secondFile.fileSize) * directionMultiplier;
     }
-    if (sortConfig.key === 'originalName') {
-      return sortConfig.direction === 'asc'
-        ? a.originalName.localeCompare(b.originalName)
-        : b.originalName.localeCompare(a.originalName);
+
+    if (sortConfig.key === 'currentVersion') {
+      return (firstFile.currentVersion - secondFile.currentVersion) * directionMultiplier;
     }
-    return 0;
+
+    if (sortConfig.key === 'category') {
+      return (firstFile.category || 'other').localeCompare(secondFile.category || 'other') * directionMultiplier;
+    }
+
+    return firstFile.originalName.localeCompare(secondFile.originalName) * directionMultiplier;
   });
 
   const handleSort = (key) => {
-    setSortConfig((prev) => ({
+    setSortConfig((currentConfig) => ({
       key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+      direction: currentConfig.key === key && currentConfig.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    if (!bytes) {
+      return '0 Bytes';
+    }
+
+    const units = ['Bytes', 'KB', 'MB', 'GB'];
+    const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const size = bytes / 1024 ** unitIndex;
+
+    return `${size.toFixed(unitIndex === 0 ? 0 : 2)} ${units[unitIndex]}`;
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateValue) =>
+    new Date(dateValue).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
 
-  const getSortIcon = (key) => {
-    if (sortConfig.key !== key) return ' ↕️';
-    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+  const getSortMarker = (key) => {
+    if (sortConfig.key !== key) {
+      return ' <> ';
+    }
+
+    return sortConfig.direction === 'asc' ? ' ^' : ' v';
   };
 
   return (
-    <div className="file-table-section" id="files">
+    <section className="file-table-section" id="files">
       <div className="section-header">
         <div className="title-wrapper">
-          <h2 className="section-title">📁 My Uploaded Files</h2>
-          <span className="file-count">{files.length} files</span>
+          <h2 className="section-title">Protected Files</h2>
+          <span className="file-count">{files.length} items</span>
         </div>
+
         <div className="search-box">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon">Find</span>
           <input
             type="text"
-            placeholder="Search files..."
+            placeholder="Search by filename"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(event) => setSearchTerm(event.target.value)}
             className="search-input"
           />
         </div>
@@ -81,33 +89,30 @@ function FileTable({ files, onDownload, onDelete, onRestore }) {
 
       {files.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">📭</div>
-          <h3 className="empty-title">No files uploaded yet</h3>
-          <p className="empty-subtitle">Upload your first file to get started</p>
+          <div className="empty-icon">Vault</div>
+          <h3 className="empty-title">No files backed up yet</h3>
+          <p className="empty-subtitle">Upload a file to start building your recovery history.</p>
         </div>
       ) : (
         <div className="table-container">
           <table className="file-table">
             <thead>
               <tr>
-                <th className="th-icon">📄</th>
-                <th 
-                  className="sortable" 
-                  onClick={() => handleSort('originalName')}
-                >
-                  Filename{getSortIcon('originalName')}
+                <th>Type</th>
+                <th className="sortable" onClick={() => handleSort('originalName')}>
+                  Filename{getSortMarker('originalName')}
                 </th>
-                <th 
-                  className="sortable"
-                  onClick={() => handleSort('uploadedAt')}
-                >
-                  Upload Date{getSortIcon('uploadedAt')}
+                <th className="sortable" onClick={() => handleSort('currentVersion')}>
+                  Version{getSortMarker('currentVersion')}
                 </th>
-                <th 
-                  className="sortable"
-                  onClick={() => handleSort('fileSize')}
-                >
-                  Size{getSortIcon('fileSize')}
+                <th className="sortable" onClick={() => handleSort('category')}>
+                  Category{getSortMarker('category')}
+                </th>
+                <th className="sortable" onClick={() => handleSort('uploadedAt')}>
+                  Updated{getSortMarker('uploadedAt')}
+                </th>
+                <th className="sortable" onClick={() => handleSort('fileSize')}>
+                  Size{getSortMarker('fileSize')}
                 </th>
                 <th className="actions-header">Actions</th>
               </tr>
@@ -116,36 +121,31 @@ function FileTable({ files, onDownload, onDelete, onRestore }) {
               {sortedFiles.map((file) => (
                 <tr key={file._id} className="file-row">
                   <td className="td-icon">
-                    <div className="file-type-icon">📄</div>
+                    <div className="file-type-icon">S3</div>
                   </td>
                   <td className="td-name">
                     <span className="file-name-text">{file.originalName}</span>
+                    <span className="file-subtext">{file.mimeType || 'application/octet-stream'}</span>
+                  </td>
+                  <td className="td-version">
+                    <span className="version-pill">v{file.currentVersion}</span>
+                  </td>
+                  <td className="td-category">
+                    <span className="size-badge">{file.category || 'other'}</span>
                   </td>
                   <td className="td-date">{formatDate(file.uploadedAt)}</td>
                   <td className="td-size">
                     <span className="size-badge">{formatFileSize(file.fileSize)}</span>
                   </td>
                   <td className="td-actions">
-                    <button
-                      className="action-btn download"
-                      onClick={() => onDownload(file._id, file.originalName)}
-                      title="Download"
-                    >
-                      ⬇️
+                    <button className="action-btn download" onClick={() => onDownload(file)} title="Download latest version">
+                      Download
                     </button>
-                    <button
-                      className="action-btn restore"
-                      onClick={() => onRestore(file)}
-                      title="Restore"
-                    >
-                      ↩️
+                    <button className="action-btn restore" onClick={() => onRestore(file)} title="Open version history">
+                      Versions
                     </button>
-                    <button
-                      className="action-btn delete"
-                      onClick={() => onDelete(file._id, file.originalName)}
-                      title="Delete"
-                    >
-                      🗑️
+                    <button className="action-btn delete" onClick={() => onDelete(file)} title="Delete file metadata">
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -154,7 +154,7 @@ function FileTable({ files, onDownload, onDelete, onRestore }) {
           </table>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

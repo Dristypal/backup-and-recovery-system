@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import './UploadSection.css';
 
 function UploadSection({ onUpload, uploading }) {
@@ -6,60 +6,63 @@ function UploadSection({ onUpload, uploading }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const inputRef = useRef(null);
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
+  const updateSelectedFile = (file) => {
+    setSelectedFile(file || null);
+  };
+
+  const handleDrag = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.type === 'dragenter' || event.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === 'dragleave') {
+    } else {
       setDragActive(false);
     }
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
+
+    if (event.dataTransfer.files?.[0]) {
+      updateSelectedFile(event.dataTransfer.files[0]);
     }
   };
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+  const handleUploadClick = async () => {
+    if (!selectedFile) {
+      return;
     }
-  };
 
-  const handleUploadClick = () => {
-    if (selectedFile) {
-      onUpload(selectedFile);
-      setSelectedFile(null);
-      if (inputRef.current) {
-        inputRef.current.value = '';
-      }
+    await onUpload(selectedFile);
+    updateSelectedFile(null);
+
+    if (inputRef.current) {
+      inputRef.current.value = '';
     }
-  };
-
-  const handleRestoreClick = () => {
-    // Restore functionality - can be implemented to restore from backup
-    alert('Restore feature: Select a backup point to restore files');
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    if (!bytes) {
+      return '0 Bytes';
+    }
+
+    const units = ['Bytes', 'KB', 'MB', 'GB'];
+    const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const size = bytes / 1024 ** unitIndex;
+
+    return `${size.toFixed(unitIndex === 0 ? 0 : 2)} ${units[unitIndex]}`;
   };
 
   return (
-    <div className="upload-section" id="upload">
+    <section className="upload-section" id="upload">
       <div className="section-header">
-        <h2 className="section-title">📤 Upload Files</h2>
-        <p className="section-subtitle">Drag and drop or click to select files</p>
+        <h2 className="section-title">Upload Your Next Recovery Point</h2>
+        <p className="section-subtitle">
+          Drop a file here and the app will store it in S3 with metadata and version history.
+        </p>
       </div>
 
       <div
@@ -73,36 +76,37 @@ function UploadSection({ onUpload, uploading }) {
         <input
           ref={inputRef}
           type="file"
-          onChange={handleFileChange}
+          onChange={(event) => updateSelectedFile(event.target.files?.[0])}
           className="file-input"
-          multiple
         />
-        
+
         {selectedFile ? (
           <div className="file-selected">
-            <div className="file-icon">📄</div>
+            <div className="file-icon">FILE</div>
             <div className="file-info">
               <p className="file-name">{selectedFile.name}</p>
               <p className="file-size">{formatFileSize(selectedFile.size)}</p>
             </div>
-            <button 
+            <button
               className="remove-file-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedFile(null);
-                if (inputRef.current) inputRef.current.value = '';
+              onClick={(event) => {
+                event.stopPropagation();
+                updateSelectedFile(null);
+                if (inputRef.current) {
+                  inputRef.current.value = '';
+                }
               }}
             >
-              ✕
+              X
             </button>
           </div>
         ) : (
           <div className="upload-placeholder">
-            <div className="upload-icon">📁</div>
+            <div className="upload-icon">S3</div>
             <p className="upload-text">
-              Drag & drop files here or <span className="upload-link">browse</span>
+              Drag and drop files here or <span className="upload-link">browse from your device</span>
             </p>
-            <p className="upload-hint">Supports all file types up to 50MB</p>
+            <p className="upload-hint">Each re-upload of the same filename creates a new recoverable version.</p>
           </div>
         )}
       </div>
@@ -113,29 +117,10 @@ function UploadSection({ onUpload, uploading }) {
           onClick={handleUploadClick}
           disabled={!selectedFile || uploading}
         >
-          {uploading ? (
-            <>
-              <span className="spinner"></span>
-              Uploading...
-            </>
-          ) : (
-            <>
-              <span>🚀</span>
-              Upload Files
-            </>
-          )}
-        </button>
-        
-        <button
-          className="restore-btn"
-          onClick={handleRestoreClick}
-          disabled={uploading}
-        >
-          <span>↩️</span>
-          Restore Files
+          {uploading ? 'Uploading...' : 'Upload to Backup Vault'}
         </button>
       </div>
-    </div>
+    </section>
   );
 }
 

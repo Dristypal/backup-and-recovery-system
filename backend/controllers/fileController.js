@@ -1,117 +1,268 @@
-
-
 const File = require('../models/File');
+const Backup = require('../models/Backup');
 const Log = require('../models/Log');
-const path = require('path');
-const fs = require('fs');
+const asyncHandler = require('../utils/asyncHandler');
+const AppError = require('../utils/AppError');
+const { sendSuccess } = require('../utils/apiResponse');
+const { getFileCategory } = require('../utils/fileCategory');
+const {
+  createFileBackupRecord,
+  markPreviousVersionsAsNotLatest
+} = require('../services/backupService');
+const {
+  buildUserFileKey,
+  getObjectBuffer,
+  getObjectStream,
+  uploadBuffer
+} = require('../services/s3Service');
 
-const uploadFile = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Please upload a file' });
+const uploadFile = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new AppError('Please upload a file', 400);
+  }
+
+  const { id: userId } = req.user;
+  const originalName = req.file.originalname.trim();
+  const category = getFileCategory(req.file.mimetype, originalName);
+  const s3Key = buildUserFileKey(userId, originalName);
+
+  let file = await File.findOne({ userId, originalName });
+  const nextVersion = file ? file.currentVersion + 1 : 1;
+
+  if (file) {
+    await markPreviousVersionsAsNotLatest(file._id);
+  }
+
+  const uploadResult = await uploadBuffer({
+    key: s3Key,
+    body: req.file.buffer,
+    contentType: req.file.mimetype,
+    metadata: {
+      uploadedBy: String(userId),
+      originalName
     }
+  });
 
-    const fileData = {
-      userId: req.user.id,
-      fileName: req.file.filename,
-      originalName: req.file.originalname,
-      filePath: req.file.path,
+  if (!file) {
+    file = await File.create({
+      userId,
+      fileName: originalName,
+      originalName,
+      filePath: s3Key,
+      s3Key,
+      s3VersionId: uploadResult.versionId,
+      fileUrl: uploadResult.url,
+      currentVersion: nextVersion,
       fileSize: req.file.size,
-      mimeType: req.file.mimetype
-    };
-
-    const file = await File.create(fileData);
-
-    await Log.create({
-      userId: req.user.id,
-      action: 'upload',
-      description: `Uploaded file ${req.file.originalname}`,
-      ipAddress: req.ip
+      mimeType: req.file.mimetype,
+      category,
+      uploadedAt: new Date()
     });
-
-    res.status(201).json({
-      message: 'File uploaded successfully',
-      file: {
-        id: file._id,
-        fileName: file.originalName,
-        fileSize: file.fileSize,
-        uploadedAt: file.uploadedAt
-      }
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+  } else {
+    file.fileName = originalName;
+    file.filePath = s3Key;
+    file.s3Key = s3Key;
+    file.s3VersionId = uploadResult.versionId;
+    file.fileUrl = uploadResult.url;
+    file.currentVersion = nextVersion;
+    file.fileSize = req.file.size;
+    file.mimeType = req.file.mimetype;
+    file.category = category;
+    file.uploadedAt = new Date();
+    await file.save();
   }
-};
 
-const getFiles = async (req, res) => {
-  try {
-    const files = await File.find({ userId: req.user.id }).sort({ uploadedAt: -1 });
+  const backupRecord = await createFileBackupRecord({
+    file,
+    versionNumber: nextVersion,
+    isLatest: true,
+    fileSize: req.file.size,
+    mimeType: req.file.mimetype,
+    category,
+    originalName,
+    uploadedAt: file.uploadedAt
+  });
 
-    res.json({
-      message: 'Files retrieved successfully',
-      count: files.length,
-      files
-    });
-  } catch (error) {
-    console.error('Get files error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+  await Log.create({
+    userId,
+    action: 'upload',
+    description: `Uploaded ${originalName} as version ${nextVersion}`,
+    ipAddress: req.ip
+  });
+
+  return sendSuccess(
+    res,
+    file.currentVersion === 1 ? 201 : 200,
+    file.currentVersion === 1 ? 'File uploaded successfully' : 'File version uploaded successfully',
+    {
+      file,
+      backup: backupRecord
+    }
+  );
+});
+
+const getFiles = asyncHandler(async (req, res) => {
+  const files = await File.find({ userId: req.user.id }).sort({ uploadedAt: -1 });
+
+  return sendSuccess(res, 200, 'Files retrieved successfully', {
+    count: files.length,
+    files
+  });
+});
+
+const getFileVersions = asyncHandler(async (req, res) => {
+  const file = await File.findById(req.params.id);
+  if (!file) {
+    throw new AppError('File not found', 404);
   }
-};
 
-const downloadFile = async (req, res) => {
-  try {
-    const file = await File.findById(req.params.id);
-
-    if (!file) {
-      return res.status(404).json({ message: 'File not found' });
-    }
-
-    if (file.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to access this file' });
-    }
-
-    await Log.create({
-      userId: req.user.id,
-      action: 'download',
-      description: `Downloaded file ${file.originalName}`,
-      ipAddress: req.ip
-    });
-
-    res.download(file.filePath, file.originalName);
-  } catch (error) {
-    console.error('Download error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+  if (String(file.userId) !== req.user.id) {
+    throw new AppError('Not authorized to view file versions', 403);
   }
-};
 
-const deleteFile = async (req, res) => {
-  try {
-    const file = await File.findById(req.params.id);
+  const versions = await Backup.find({
+    fileId: file._id,
+    backupType: 'file'
+  }).sort({ versionNumber: -1 });
 
-    if (!file) {
-      return res.status(404).json({ message: 'File not found' });
-    }
+  return sendSuccess(res, 200, 'File versions retrieved successfully', {
+    file,
+    versions
+  });
+});
 
-    if (file.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to delete this file' });
-    }
-
-    await Log.create({
-      userId: req.user.id,
-      action: 'delete',
-      description: `Deleted file ${file.originalName}`,
-      ipAddress: req.ip
-    });
-
-    fs.unlinkSync(file.filePath);
-    await File.findByIdAndDelete(req.params.id);
-
-    res.json({ message: 'File deleted successfully' });
-  } catch (error) {
-    console.error('Delete error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+const downloadFile = asyncHandler(async (req, res) => {
+  const file = await File.findById(req.params.id);
+  if (!file) {
+    throw new AppError('File not found', 404);
   }
-};
 
-module.exports = { uploadFile, getFiles, downloadFile, deleteFile };
+  if (String(file.userId) !== req.user.id) {
+    throw new AppError('Not authorized to access this file', 403);
+  }
+
+  const requestedVersion = req.query.versionId || file.s3VersionId;
+  const s3Response = await getObjectStream({
+    key: file.s3Key,
+    versionId: requestedVersion
+  });
+
+  await Log.create({
+    userId: req.user.id,
+    action: 'download',
+    description: `Downloaded ${file.originalName}${requestedVersion ? ` (version ${requestedVersion})` : ''}`,
+    ipAddress: req.ip
+  });
+
+  res.setHeader('Content-Disposition', `attachment; filename="${file.originalName}"`);
+  res.setHeader('Content-Type', s3Response.ContentType || file.mimeType || 'application/octet-stream');
+
+  if (requestedVersion) {
+    res.setHeader('x-s3-version-id', requestedVersion);
+  }
+
+  s3Response.Body.pipe(res);
+});
+
+const deleteFile = asyncHandler(async (req, res) => {
+  const file = await File.findById(req.params.id);
+  if (!file) {
+    throw new AppError('File not found', 404);
+  }
+
+  if (String(file.userId) !== req.user.id) {
+    throw new AppError('Not authorized to delete this file', 403);
+  }
+
+  await Backup.updateMany(
+    { fileId: file._id, backupType: 'file' },
+    { $set: { isLatest: false } }
+  );
+  await File.findByIdAndDelete(file._id);
+
+  await Log.create({
+    userId: req.user.id,
+    action: 'delete',
+    description: `Deleted metadata for ${file.originalName}`,
+    ipAddress: req.ip
+  });
+
+  return sendSuccess(res, 200, 'File metadata deleted successfully');
+});
+
+const restoreFileVersion = asyncHandler(async (req, res) => {
+  const backup = await Backup.findOne({
+    _id: req.params.backupId,
+    backupType: 'file'
+  });
+
+  if (!backup) {
+    throw new AppError('Backup version not found', 404);
+  }
+
+  const file = await File.findById(backup.fileId);
+  if (!file) {
+    throw new AppError('Linked file not found', 404);
+  }
+
+  if (String(file.userId) !== req.user.id) {
+    throw new AppError('Not authorized to restore this file', 403);
+  }
+
+  const buffer = await getObjectBuffer({
+    key: backup.s3Key,
+    versionId: backup.s3VersionId
+  });
+
+  await markPreviousVersionsAsNotLatest(file._id);
+
+  const restoredUpload = await uploadBuffer({
+    key: file.s3Key,
+    body: buffer,
+    contentType: backup.mimeType,
+    metadata: {
+      restoredFromVersion: String(backup.versionNumber),
+      originalName: backup.originalName
+    }
+  });
+
+  file.s3VersionId = restoredUpload.versionId;
+  file.fileUrl = restoredUpload.url;
+  file.fileSize = backup.fileSize;
+  file.mimeType = backup.mimeType;
+  file.currentVersion += 1;
+  file.uploadedAt = new Date();
+  await file.save();
+
+  const restoredBackup = await createFileBackupRecord({
+    file,
+    versionNumber: file.currentVersion,
+    isLatest: true,
+    fileSize: file.fileSize,
+    mimeType: file.mimeType,
+    category: file.category,
+    originalName: file.originalName,
+    uploadedAt: file.uploadedAt
+  });
+
+  await Log.create({
+    userId: req.user.id,
+    action: 'restore',
+    description: `Restored ${file.originalName} from version ${backup.versionNumber}`,
+    ipAddress: req.ip
+  });
+
+  return sendSuccess(res, 200, 'File restored successfully', {
+    file,
+    restoredBackup
+  });
+});
+
+module.exports = {
+  deleteFile,
+  downloadFile,
+  getFiles,
+  getFileVersions,
+  restoreFileVersion,
+  uploadFile
+};

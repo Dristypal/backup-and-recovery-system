@@ -11,7 +11,7 @@ const logSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: ['login', 'logout', 'upload', 'download', 'delete', 'register']
+    enum: ['login', 'logout', 'upload', 'download', 'delete', 'register', 'restore', 'backup']
   },
   description: {
     type: String,

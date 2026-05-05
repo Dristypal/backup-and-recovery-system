@@ -1,29 +1,31 @@
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 import './Sidebar.css';
 
-function Sidebar() {
+function Sidebar({ onCreateBackup, onRestoreLatestBackup, backupLoading, isAdmin }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/dashboard#upload', label: 'Upload Files', icon: '📤' },
-    { path: '/dashboard#files', label: 'My Files', icon: '📁' },
-    { path: '/dashboard#settings', label: 'Settings', icon: '⚙️' }
+    { path: '/dashboard', label: 'Dashboard', icon: 'Dashboard' },
+    { path: '/dashboard#upload', label: 'Upload Files', icon: 'Upload' },
+    { path: '/dashboard#files', label: 'My Files', icon: 'Files' },
+    { path: '/dashboard#backups', label: 'Backups', icon: 'Recovery' }
   ];
+
+  const handleNavigate = (path) => {
+    if (path.includes('#')) {
+      window.location.assign(path);
+      return;
+    }
+
+    navigate(path);
+  };
 
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="logo">
-          <span className="logo-icon">☁️</span>
+          <span className="logo-icon">CB</span>
           <span className="logo-text">CLOUDORIA</span>
         </div>
       </div>
@@ -32,8 +34,8 @@ function Sidebar() {
         {menuItems.map((item) => (
           <button
             key={item.path}
-            onClick={() => navigate(item.path)}
-            className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+            onClick={() => handleNavigate(item.path)}
+            className={`nav-item ${location.pathname === '/dashboard' && item.path.startsWith('/dashboard') ? 'active' : ''}`}
           >
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
@@ -41,12 +43,16 @@ function Sidebar() {
         ))}
       </nav>
 
-      <div className="sidebar-footer">
-        <button onClick={handleLogout} className="logout-btn">
-          <span className="nav-icon">🚪</span>
-          <span className="nav-label">Logout</span>
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="sidebar-footer action-stack">
+          <button onClick={onCreateBackup} className="sidebar-action primary" disabled={backupLoading}>
+            {backupLoading ? 'Creating...' : 'Backup Now'}
+          </button>
+          <button onClick={onRestoreLatestBackup} className="sidebar-action secondary" disabled={backupLoading}>
+            Restore Latest
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

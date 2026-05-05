@@ -1,0 +1,105 @@
+.backup-panel {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 20px 45px rgba(23, 31, 56, 0.08);
+}
+
+.backup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.backup-column {
+  background: linear-gradient(180deg, #f7f4ef 0%, #fffdf9 100%);
+  border: 1px solid #e7dccf;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.backup-column-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.backup-column-header h3 {
+  color: #352718;
+  margin: 0;
+}
+
+.backup-column-header span {
+  background: #2f6b5f;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.backup-item {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #ece4da;
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px;
+}
+
+.backup-item strong {
+  color: #30231a;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.backup-item p {
+  color: #786758;
+  font-size: 13px;
+  margin: 0;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.backup-actions button,
+.backup-tag {
+  background: #1f5147;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.backup-actions button.secondary {
+  background: #d9b26f;
+  color: #3b2a14;
+}
+
+.backup-tag {
+  background: #efe3d4;
+  color: #6c4f2b;
+  cursor: default;
+}
+
+.backup-empty {
+  color: #7c6b5c;
+  margin: 0;
+  padding: 18px 0;
+}
+
+@media (max-width: 900px) {
+  .backup-grid {
+    grid-template-columns: 1fr;
+  }
+}

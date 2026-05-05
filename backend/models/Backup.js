@@ -1,10 +1,20 @@
 const mongoose = require('mongoose');
 
-const fileSchema = new mongoose.Schema({
+const backupSchema = new mongoose.Schema({
+  backupType: {
+    type: String,
+    enum: ['file', 'database'],
+    required: true
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    default: null
+  },
+  fileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'File',
+    default: null
   },
   fileName: {
     type: String,
@@ -14,11 +24,11 @@ const fileSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  filePath: {
+  s3Key: {
     type: String,
     required: true
   },
-  s3Key: {
+  s3Url: {
     type: String,
     required: true
   },
@@ -26,27 +36,32 @@ const fileSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  fileUrl: {
-    type: String
-  },
-  currentVersion: {
+  versionNumber: {
     type: Number,
     default: 1
   },
   fileSize: {
     type: Number,
-    required: true
+    default: 0
   },
   mimeType: {
     type: String,
-    required: true
+    default: 'application/octet-stream'
   },
   category: {
     type: String,
     enum: ['image', 'document', 'database', 'other'],
     default: 'other'
   },
-  uploadedAt: {
+  isLatest: {
+    type: Boolean,
+    default: false
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  createdAt: {
     type: Date,
     default: Date.now
   }
@@ -54,6 +69,7 @@ const fileSchema = new mongoose.Schema({
   timestamps: true
 });
 
-fileSchema.index({ userId: 1, originalName: 1 }, { unique: true });
+backupSchema.index({ backupType: 1, createdAt: -1 });
+backupSchema.index({ fileId: 1, versionNumber: -1 });
 
-module.exports = mongoose.model('File', fileSchema);
+module.exports = mongoose.model('Backup', backupSchema);

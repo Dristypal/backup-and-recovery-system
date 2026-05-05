@@ -1,24 +1,27 @@
 import './DashboardCards.css';
 
-function DashboardCards({ totalUploads, storageUsed, storageLimit, lastUploadDate }) {
-  // Calculate storage percentage
+function DashboardCards({ totalUploads, storageUsed, storageLimit, lastUploadDate, lastBackupDate, backupCount }) {
   const storagePercentage = Math.min((storageUsed / storageLimit) * 100, 100);
-  const storageRemaining = storageLimit - storageUsed;
+  const storageRemaining = Math.max(storageLimit - storageUsed, 0);
 
-  // Format file size
   const formatSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    if (!bytes) {
+      return '0 Bytes';
+    }
+
+    const units = ['Bytes', 'KB', 'MB', 'GB'];
+    const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const size = bytes / 1024 ** unitIndex;
+
+    return `${size.toFixed(unitIndex === 0 ? 0 : 2)} ${units[unitIndex]}`;
   };
 
-  // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return 'No uploads yet';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    if (!dateString) {
+      return 'No uploads yet';
+    }
+
+    return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -28,49 +31,40 @@ function DashboardCards({ totalUploads, storageUsed, storageLimit, lastUploadDat
   };
 
   return (
-    <div className="dashboard-cards">
-      {/* Total Uploads Card */}
-      <div className="card card-uploads">
-        <div className="card-icon">📦</div>
+    <section className="dashboard-cards">
+      <article className="card card-uploads">
+        <div className="card-icon">Files</div>
         <div className="card-content">
-          <h3 className="card-title">Total Uploads</h3>
+          <h3 className="card-title">Total Files</h3>
           <p className="card-value">{totalUploads}</p>
-          <p className="card-subtitle">Files stored</p>
+          <p className="card-subtitle">Protected file entries in MongoDB</p>
         </div>
-      </div>
+      </article>
 
-      {/* Storage Used Card */}
-      <div className="card card-storage">
-        <div className="card-icon">💾</div>
+      <article className="card card-storage">
+        <div className="card-icon">Usage</div>
         <div className="card-content">
           <h3 className="card-title">Storage Used</h3>
           <p className="card-value">{formatSize(storageUsed)}</p>
           <div className="progress-container">
-            <div 
-              className="progress-bar" 
-              style={{ width: `${storagePercentage}%` }}
-            ></div>
+            <div className="progress-bar" style={{ width: `${storagePercentage}%` }}></div>
           </div>
           <p className="card-subtitle">
-            {storagePercentage.toFixed(1)}% of {formatSize(storageLimit)} used
+            {storagePercentage.toFixed(1)}% used, {formatSize(storageRemaining)} remaining
           </p>
         </div>
-      </div>
+      </article>
 
-      {/* Last Upload Card */}
-      <div className="card card-last-upload">
-        <div className="card-icon">🕐</div>
+      <article className="card card-last-upload">
+        <div className="card-icon">Backups</div>
         <div className="card-content">
-          <h3 className="card-title">Last Upload</h3>
-          <p className="card-value">{formatDate(lastUploadDate)}</p>
-          <p className="card-subtitle">
-            {storageRemaining > 0 
-              ? `${formatSize(storageRemaining)} remaining` 
-              : 'Storage full'}
-          </p>
+          <h3 className="card-title">Recovery Points</h3>
+          <p className="card-value">{backupCount}</p>
+          <p className="card-subtitle">Last backup: {formatDate(lastBackupDate)}</p>
+          <p className="card-subtitle">Last upload: {formatDate(lastUploadDate)}</p>
         </div>
-      </div>
-    </div>
+      </article>
+    </section>
   );
 }
 
