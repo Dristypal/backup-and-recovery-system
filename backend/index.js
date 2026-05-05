@@ -19,6 +19,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 connectDB();
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ success: true, message: 'ok' });
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/backups', backupRoutes);
@@ -44,4 +47,3 @@ app.listen(PORT, async () => {
 
   startBackupCron();
 });
-

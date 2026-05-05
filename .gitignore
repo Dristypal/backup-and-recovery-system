@@ -1,0 +1,21 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment variables
+.env
+*.env
+.env.local
+frontend/.env
+backend/.env
+
+# OS files
+.DS_Store
+
+# Editor
+.vscode/
+
+# Logs
+logs/
+*.log
